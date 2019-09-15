@@ -1,0 +1,195 @@
+---
+title: "Lab01 - Polynomial Regression"
+author: "Solutions"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This lab is adapted from Section 3.6 of ISLR.
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com> and <https://www.rstudio.com/wp-content/uploads/2016/03/rmarkdown-cheatsheet-2.0.pdf>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. An R code chunk looks like this:
+
+```{r}
+2 + 2
+log(10)
+```
+
+<!-- Note: All R code has to go inbetween the line that looks like ```{r} and the line that looks like ```!! -->
+
+There are three main ways to run R code.  First, whenever you knit the document, all chunks will be run in a "fresh" R session.
+
+However, as you're going along you will also want to run commands in a working session so that you can check that your code runs without having to knit the whole document.  To do that, you can run individual code chunks by clicking the green "Play" arrow at the top right corner of the chunk.
+
+You can also select individual lines of code you want to run and choose "Run... Run Selected Line(s)" from the menu at the top of the editor window.
+
+The second two of these approaches will send commands to your Console, at the bottom of the screen.  **Except for in times of desperation, you never want to enter commands directly into the Console!**  Any commands you enter directly into the console will run one time only, and will not be a permanent part of your R Markdown document.  **Always enter commands you want to save directly into your R Markdown document!!**.
+
+Try out all three of those approaches with the example code chunk above.
+
+## Loading Packages
+
+R comes with a decent amount of built-in functionality, but to do anything useful you will need to load *packages* that contain additional functionality.  You load packages with the `library` command.  Here we will load 3 packages with functionality you will need for this lab: readr, dplyr, and ggplot2.  Run the code chunk below to load these packages.
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+## Boston Housing Data
+
+The following R code reads in a data set with information about housing in 506 neighborhoods around Boston.  It then uses the `head` function to look at the first few rows of the data.
+
+```{r}
+Boston <- read_csv("http://www.evanlray.com/data/mass/Boston.csv")
+head(Boston)
+```
+
+We can find out the number of rows (observational units) and columns (variables) in the data set with the `dim` command:
+
+```{r}
+dim(Boston)
+```
+
+We see that we have data for 506 observational units and 14 variables.  Each observational unit in this data set is a neighborhood around Boston.  In this lab, we'll look at just two of the 14 variables:
+
+ * `nox` is the nitric oxide concentration (parts per 10 million).  High concentrations of nitric oxide are hazardous to human health.
+ * `dis` is the weighted distance to five Boston employment centers.
+
+## Train/Test Split
+
+In this lab, you will fit several polynomial regression models to the data and compare their performance.  Here, we set up a train/test split of the data, using 75% of the data for the training set and the remaining 25% for the test set.  **Below, you will fit your models to the training data and evaluate and compare their predictive performance on the test data.**
+
+```{r}
+set.seed(62585) # seed generated at random.org
+
+num_train <- floor(0.75 * nrow(Boston))
+train_inds <- sample(nrow(Boston), size = num_train) %>%
+  sort()
+
+train_Boston <- Boston %>%
+  slice(train_inds)
+
+test_Boston <- Boston %>%
+  slice(-train_inds)
+```
+
+## Problem 1: Make a scatter plot of the training set data using ggplot2.  Put `dis` on the horizontal axis and `nox` on the vertical axis.  (See the simple linear regression handout from the first day if you're not sure how to do this -- we will discuss plots with ggplot2 in more detail in coming days.)
+
+```{r}
+ggplot(data =  train_Boston, mapping = aes(x = dis, y = nox)) +
+  geom_point()
+```
+
+## Problem 2: Fit a polynomials of each degree 1 through 8 to the training set data, with `nox` as the response variable and `dis` as the explanatory variable.  You will fit 8 separate models.  Recall that you can use the `poly` function to avoid having to manually type out all the polynomial degree terms.
+
+```{r}
+fit_deg1 <- lm(nox ~ dis, data = train_Boston)
+fit_deg2 <- lm(nox ~ poly(dis, 2, raw = TRUE), data = train_Boston)
+fit_deg3 <- lm(nox ~ poly(dis, 3, raw = TRUE), data = train_Boston)
+fit_deg4 <- lm(nox ~ poly(dis, 4, raw = TRUE), data = train_Boston)
+fit_deg5 <- lm(nox ~ poly(dis, 5, raw = TRUE), data = train_Boston)
+fit_deg6 <- lm(nox ~ poly(dis, 6, raw = TRUE), data = train_Boston)
+fit_deg7 <- lm(nox ~ poly(dis, 7, raw = TRUE), data = train_Boston)
+fit_deg8 <- lm(nox ~ poly(dis, 8, raw = TRUE), data = train_Boston)
+```
+
+## Problem 3: For each model fit, record the following things: (1) the training set MSE; (2) the test set MSE; (3) the highest polynomial degree that would be "statistically signficant" according to a hypothesis test conducted at the $\alpha = 0.05$ level.
+
+```{r}
+summary(fit_deg1)
+summary(fit_deg2)
+summary(fit_deg3)
+summary(fit_deg4)
+summary(fit_deg5)
+summary(fit_deg6)
+summary(fit_deg7)
+summary(fit_deg8)
+```
+
+```{r}
+results <- data.frame(
+  poly_degree = 1:8,
+  train_mse = NA,
+  test_mse = NA,
+  highest_sig_degree = c(1, 2, 3, 1, 5, 6, 7, 3)
+)
+
+for(degree in 1:8) {
+  fit <- get(paste0("fit_deg", degree))
+  results$train_mse[degree] <-
+    mean((train_Boston$nox - predict(fit))^2)
+  results$test_mse[degree] <-
+    mean((test_Boston$nox - predict(fit, newdata = test_Boston))^2)
+}
+
+results
+```
+
+
+## Problem 4: Make a scatter plot showing the training set data in one color and the test set data in a second color, and curves showing your model fits of degree 1, 3, 5, and 7.  You might use a different color and linetype to distinguish the different model fits.
+
+```{r}
+predict_deg1 <- function(x) {
+  predict(fit_deg1, data.frame(dis = x))
+}
+predict_deg3 <- function(x) {
+  predict(fit_deg3, data.frame(dis = x))
+}
+predict_deg5 <- function(x) {
+  predict(fit_deg5, data.frame(dis = x))
+}
+predict_deg7 <- function(x) {
+  predict(fit_deg7, data.frame(dis = x))
+}
+
+ggplot(data =  train_Boston, mapping = aes(x = dis, y = nox)) +
+  geom_point() +
+  geom_point(data = test_Boston, mapping = aes(x = dis, y = nox), color = "orange") +
+  stat_function(fun = predict_deg1, color = "purple") +
+  stat_function(fun = predict_deg3, color = "blue", linetype = 2) +
+  stat_function(fun = predict_deg5, color = "cornflowerblue", linetype = 3) +
+  stat_function(fun = predict_deg7, color = "darkgreen", linetype = 4)
+```
+
+
+## Problem 5: Discuss your answers to Problems 3 and 4.  Here are some things to think about: 
+#### (a) Which model or models seem best based on your plots?
+
+Out of the models included in the plot, the degree 3 fit seems best.  The degree 1 fit does not capture the non-linearity in the data, and the degree 5 and 7 polynomials have too much extreme curvature on the right hand side of the plot.
+
+#### (b) Which model or models seem best based on test set MSE?  Is this result consistent which what you see in the plots?
+
+The test set MSE is lowest for the degree 3 polynomial.  All of the degree 2, 3, and 4 models have similar MSE.  This is consistent with the conclusion from the plot.
+
+#### (c) If you had used training set MSE to select the model, would you have made a good decision?
+
+The training set MSE was lowest for the degree 8 polynomial fit.  This is not the best choice.
+
+Training set MSE is not a reliable measure to use for selecting the polynomial degree.
+
+#### (d) Do the hypothesis tests tell a consistent story about what polynomial degree to choose?  If you had just started with a degree 7 polynomial and decided on the polynomial degree based on the hypothesis tests from that model, would you have made a good decision?
+
+The hypothesis test results are very inconsistent.  For example, the test results for the degree 3 and degree 5 polynomials both indicate that all of the terms included in those models are statistically significant and should be included.  However, the test results for the degree 4 polynomial suggest that not all of those terms are contributing to the model fit.
+
+If we started with a degree 7 polynomial model, the hypothesis tests would have indicated we should keep all of those polynomial terms in the model.  However, we have seen from the plots and test set evaluation above that the degree 7 fit is not the best model for these data.
+
+Hypothesis test results are not a reliable measure to use for selecting the polynomial degree.
+
+## Problem 6: Just for kicks, try fitting a polynomial of degree 13 to the data.  Print out the summary for this model fit.  What problems does it indicate?  Now fit the model again, but specify raw = FALSE to the poly function.  Does this solve the problem?  We will discuss what's going on next class.
+
+```{r}
+fit_deg13a <- lm(nox ~ poly(dis, 13, raw = TRUE), data = train_Boston)
+summary(fit_deg13a)
+fit_deg13b <- lm(nox ~ poly(dis, 13, raw = FALSE), data = train_Boston)
+summary(fit_deg13b)
+```
+
+The first fit indicates a problem with a design matrix that is not full rank.  This is not an issue in the second fit.
